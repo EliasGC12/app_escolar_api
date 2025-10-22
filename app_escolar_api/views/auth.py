@@ -17,28 +17,43 @@ class CustomAuthToken(ObtainAuthToken):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         if user.is_active:
-
+            # Obtener perfil y roles del usuario
             roles = user.groups.all()
             role_names = []
+            # Verifico si el usuario tiene un perfil asociado
             for role in roles:
                 role_names.append(role.name)
 
-            profile = Administradores.objects.filter(user=user).first()
-            if not profile:
-                return Response({},404)
-
+            #Si solo es un rol especifico asignamos el elemento 0
+            role_names = role_names[0]
+            
+            #Esta función genera la clave dinámica (token) para iniciar sesión
             token, created = Token.objects.get_or_create(user=user)
-
-            return Response({
-                'id': user.pk,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'email': user.email,
-                'token': token.key,
-                'roles': role_names
-
-            })
-        return Response({}, status=status.HTTP_403_FORBIDDEN)
+            
+           #Verificar que tipo de usuario quiere iniciar sesión
+            
+            if role_names == 'alumno':
+                alumno = Alumnos.objects.filter(user=user).first()
+                alumno = AlumnoSerializer(alumno).data
+                alumno["token"] = token.key
+                alumno["rol"] = "alumno"
+                return Response(alumno,200)
+            if role_names == 'maestro':
+                maestro = Maestros.objects.filter(user=user).first()
+                maestro = MaestroSerializer(maestro).data
+                maestro["token"] = token.key
+                maestro["rol"] = "maestro"
+                return Response(maestro,200)
+            if role_names == 'administrador':
+                user = UserSerializer(user, many=False).data
+                user['token'] = token.key
+                user["rol"] = "administrador"
+                return Response(user,200)
+            else:
+                return Response({"details":"Forbidden"},403)
+                pass
+            
+        return Response({}, status=status.HTTP_403_FORBIDDEN) 
 
 
 class Logout(generics.GenericAPIView):
