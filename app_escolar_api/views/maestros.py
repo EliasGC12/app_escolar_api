@@ -11,6 +11,7 @@ from django.contrib.auth.models import Group
 import json
 
 class MaestrosAll(generics.CreateAPIView):
+    # Obtener la lista de todos los maestros activos
     # Necesita permisos de autenticación de usuario para poder acceder a la petición
     permission_classes = (permissions.IsAuthenticated,)
     def get(self, request, *args, **kwargs):
