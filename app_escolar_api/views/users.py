@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from django.contrib.auth.models import Group
 from django.shortcuts import get_object_or_404
+import json
 
 class AdminAll(generics.CreateAPIView):
     #Esta función es esencial para todo donde se requiera autorización de inicio de sesión (token)
@@ -20,9 +21,14 @@ class AdminAll(generics.CreateAPIView):
         return Response(lista, 200)
 
 class AdminView(generics.CreateAPIView):
+    # Permisos por método (sobrescribe el comportamiento default)
+    # Verifica que el usuario esté autenticado para las peticiones GET, PUT y DELETE
+    def get_permissions(self):
+        if self.request.method in ['GET', 'PUT', 'DELETE']:
+            return [permissions.IsAuthenticated()]
+        return []  # POST no requiere autenticación
+    
     #Obtener usuario por ID
-    # Verifica que el usuario esté autenticado
-    permission_classes = (permissions.IsAuthenticated,)
     def get(self, request, *args, **kwargs):
         admin = get_object_or_404(Administradores, id = request.GET.get("id"))
         admin = AdminSerializer(admin, many=False).data
@@ -99,3 +105,33 @@ class AdminView(generics.CreateAPIView):
         
         return Response({"message": "Administrador actualizado correctamente", "admin": AdminSerializer(admin).data}, 200)
         # return Response(user,200)
+        
+    # Eliminar administrador con delete (Borrar realmente)
+    # TODO: Agregar eliminación de administradores
+        
+class TotalUsers(generics.CreateAPIView):
+    #Contar el total de cada tipo de usuarios
+    def get(self, request, *args, **kwargs):
+        #Obtener total de admins
+        admin = Administradores.objects.filter(user__is_active = 1).order_by("id")
+        lista_admins = AdminSerializer(admin, many=True).data
+        # Obtienes la cantidad de elementos en la lista
+        total_admins = len(lista_admins)
+
+        #Obtener total de maestros
+        maestros = Maestros.objects.filter(user__is_active = 1).order_by("id")
+        lista_maestros = MaestroSerializer(maestros, many=True).data
+        #Aquí convertimos los valores de nuevo a un array
+        if not lista_maestros:
+            return Response({},400)
+        for maestro in lista_maestros:
+            maestro["materias_json"] = json.loads(maestro["materias_json"])
+        
+        total_maestros = len(lista_maestros)
+
+        #Obtener total de alumnos
+        alumnos = Alumnos.objects.filter(user__is_active = 1).order_by("id")
+        lista_alumnos = AlumnoSerializer(alumnos, many=True).data
+        total_alumnos = len(lista_alumnos)
+
+        return Response({'admins': total_admins, 'maestros': total_maestros, 'alumnos:':total_alumnos }, 200)

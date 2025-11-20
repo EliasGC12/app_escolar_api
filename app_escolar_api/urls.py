@@ -23,6 +23,8 @@ urlpatterns = [
         path('maestros/', maestros.MaestrosView.as_view()),
     #Listar Maestros
         path('lista-maestros/', maestros.MaestrosAll.as_view()),
+    #Total de usuarios
+        path('total-usuarios/', users.TotalUsers.as_view()),
     #Login
         path('login/', auth.CustomAuthToken.as_view()),
     #Logout
