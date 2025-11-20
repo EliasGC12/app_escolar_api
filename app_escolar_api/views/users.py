@@ -112,26 +112,33 @@ class AdminView(generics.CreateAPIView):
 class TotalUsers(generics.CreateAPIView):
     #Contar el total de cada tipo de usuarios
     def get(self, request, *args, **kwargs):
-        #Obtener total de admins
-        admin = Administradores.objects.filter(user__is_active = 1).order_by("id")
-        lista_admins = AdminSerializer(admin, many=True).data
-        # Obtienes la cantidad de elementos en la lista
-        total_admins = len(lista_admins)
+        # TOTAL ADMINISTRADORES
+        admin_qs = Administradores.objects.filter(user__is_active=True)
+        total_admins = admin_qs.count()
 
-        #Obtener total de maestros
-        maestros = Maestros.objects.filter(user__is_active = 1).order_by("id")
-        lista_maestros = MaestroSerializer(maestros, many=True).data
-        #Aquí convertimos los valores de nuevo a un array
-        if not lista_maestros:
-            return Response({},400)
+        # TOTAL MAESTROS
+        maestros_qs = Maestros.objects.filter(user__is_active=True)
+        lista_maestros = MaestroSerializer(maestros_qs, many=True).data
+
+        # Convertir materias_json solo si existen maestros
         for maestro in lista_maestros:
-            maestro["materias_json"] = json.loads(maestro["materias_json"])
-        
-        total_maestros = len(lista_maestros)
+            try:
+                maestro["materias_json"] = json.loads(maestro["materias_json"])
+            except Exception:
+                maestro["materias_json"] = []  # fallback seguro
 
-        #Obtener total de alumnos
-        alumnos = Alumnos.objects.filter(user__is_active = 1).order_by("id")
-        lista_alumnos = AlumnoSerializer(alumnos, many=True).data
-        total_alumnos = len(lista_alumnos)
+        total_maestros = maestros_qs.count()
 
-        return Response({'admins': total_admins, 'maestros': total_maestros, 'alumnos:':total_alumnos }, 200)
+        # TOTAL ALUMNOS
+        alumnos_qs = Alumnos.objects.filter(user__is_active=True)
+        total_alumnos = alumnos_qs.count()
+
+        # Respuesta final SIEMPRE válida
+        return Response(
+            {
+                "admins": total_admins,
+                "maestros": total_maestros,
+                "alumnos": total_alumnos
+            },
+            status=200
+        )
