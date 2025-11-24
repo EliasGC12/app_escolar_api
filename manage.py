@@ -2,9 +2,12 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from dotenv import load_dotenv
+
 
 
 def main():
+    load_dotenv()  # Carga las variables de entorno desde el archivo .env
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app_escolar_api.settings')
     try:
         from django.core.management import execute_from_command_line

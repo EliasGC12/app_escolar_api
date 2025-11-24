@@ -73,11 +73,11 @@ WSGI_APPLICATION = 'app_escolar_api.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'OPTIONS': {
-            'read_default_file': os.path.join(BASE_DIR, "my.cnf"),
-            'charset': 'utf8mb4',
-        }
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('DB_NAME','neondb'),
+        'USER': os.environ.get('DB_USER', 'neondb_owner'),
+        'PASSWORD': os.environ.get('DB_PASSWORD'),  # set this in the environment (no hardcoded secrets)
+        'HOST': 'ep-winter-cell-adghtl1b-pooler.c-2.us-east-1.aws.neon.tech',
     }
 }
 
