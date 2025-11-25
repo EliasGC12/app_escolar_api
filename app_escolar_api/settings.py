@@ -7,7 +7,7 @@ SECRET_KEY = '-_&+lsebec(whhw!%n@ww&1j=4-^j_if9x8$q778+99oz&!ms2'
 
 DEBUG = True  # en desarrollo
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1","appescolarapi-production-56e4.up.railway.app",]
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -36,7 +36,9 @@ MIDDLEWARE = [
 # Configuración de CORS: define orígenes permitidos y quita CORS_ORIGIN_ALLOW_ALL
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:4200',
+    'https://app-escolar-webapp-nu.vercel.app'
 ]
+
 CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'app_escolar_api.urls'
