@@ -8,130 +8,77 @@ from rest_framework import status
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
-# Configurar logging detallado
 logger = logging.getLogger(__name__)
 
+@method_decorator(csrf_exempt, name='dispatch')
 class CustomAuthToken(ObtainAuthToken):
+    """Login con CSRF desactivado"""
 
     def post(self, request, *args, **kwargs):
-        logger.info("="*50)
-        logger.info("INICIO DE LOGIN")
-        logger.info(f"Datos recibidos: {request.data}")
+        logger.info(f"Login attempt for user: {request.data.get('username', 'unknown')}")
         
-        try:
-            serializer = self.serializer_class(data=request.data,
-                                            context={'request': request})
-            serializer.is_valid(raise_exception=True)
-            user = serializer.validated_data['user']
-            
-            logger.info(f"Usuario encontrado: {user.username}")
-            logger.info(f"Usuario activo: {user.is_active}")
-            
-            if not user.is_active:
-                logger.error("ERROR: Usuario inactivo")
-                return Response(
-                    {"error": "Usuario inactivo", "code": "USER_INACTIVE"},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            # Obtener roles del usuario
+        serializer = self.serializer_class(data=request.data,
+                                        context={'request': request})
+
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        
+        if user.is_active:
+            # Obtener perfil y roles del usuario
             roles = user.groups.all()
-            role_names = [role.name for role in roles]
+            role_names = []
             
-            logger.info(f"Roles del usuario: {role_names}")
-            logger.info(f"Número de roles: {len(role_names)}")
-            
-            if not role_names:
-                logger.error("ERROR: Usuario sin roles asignados")
-                return Response(
-                    {"error": "Usuario sin roles asignados", "code": "NO_ROLES"},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            # Tomar el primer rol
-            primary_role = role_names[0]
-            logger.info(f"Rol primario: {primary_role}")
+            for role in roles:
+                role_names.append(role.name)
+
+            # Si solo es un rol especifico asignamos el elemento 0
+            role_names = role_names[0]
             
             # Generar token
             token, created = Token.objects.get_or_create(user=user)
-            logger.info(f"Token: {token.key[:20]}...")
             
-            # DEBUG: Mostrar todos los datos disponibles
-            logger.info(f"DEBUG - Role comparaciones:")
-            logger.info(f"  primary_role == 'alumno': {primary_role == 'alumno'}")
-            logger.info(f"  primary_role == 'maestro': {primary_role == 'maestro'}")
-            logger.info(f"  primary_role == 'administrador': {primary_role == 'administrador'}")
-            
-            # Verificar tipo de usuario
-            if primary_role == 'alumno':
-                logger.info("Procesando como alumno...")
+            # Verificar que tipo de usuario quiere iniciar sesión
+            if role_names == 'alumno':
                 alumno = Alumnos.objects.filter(user=user).first()
-                if not alumno:
-                    logger.error("ERROR: Perfil de alumno no encontrado")
-                    return Response(
-                        {"error": "Perfil de alumno no encontrado", "code": "NO_ALUMNO_PROFILE"},
-                        status=status.HTTP_404_NOT_FOUND
-                    )
-                alumno_data = AlumnoSerializer(alumno).data
-                alumno_data["token"] = token.key
-                alumno_data["rol"] = "alumno"
-                logger.info("LOGIN EXITOSO como alumno")
-                return Response(alumno_data, 200)
+                alumno = AlumnoSerializer(alumno).data
+                alumno["token"] = token.key
+                alumno["rol"] = "alumno"
+                logger.info(f"Login successful as alumno: {user.username}")
+                return Response(alumno, 200)
                 
-            elif primary_role == 'maestro':
-                logger.info("Procesando como maestro...")
+            if role_names == 'maestro':
                 maestro = Maestros.objects.filter(user=user).first()
-                if not maestro:
-                    logger.error("ERROR: Perfil de maestro no encontrado")
-                    return Response(
-                        {"error": "Perfil de maestro no encontrado", "code": "NO_MAESTRO_PROFILE"},
-                        status=status.HTTP_404_NOT_FOUND
-                    )
-                maestro_data = MaestroSerializer(maestro).data
-                maestro_data["token"] = token.key
-                maestro_data["rol"] = "maestro"
-                logger.info("LOGIN EXITOSO como maestro")
-                return Response(maestro_data, 200)
+                maestro = MaestroSerializer(maestro).data
+                maestro["token"] = token.key
+                maestro["rol"] = "maestro"
+                logger.info(f"Login successful as maestro: {user.username}")
+                return Response(maestro, 200)
                 
-            elif primary_role == 'administrador':
-                logger.info("Procesando como administrador...")
+            if role_names == 'administrador':
                 user_data = UserSerializer(user, many=False).data
                 user_data['token'] = token.key
                 user_data["rol"] = "administrador"
-                logger.info("LOGIN EXITOSO como administrador")
+                logger.info(f"Login successful as administrador: {user.username}")
                 return Response(user_data, 200)
-                
             else:
-                logger.error(f"ERROR: Rol no reconocido: '{primary_role}'")
-                logger.error(f"Roles disponibles en sistema: {list(Group.objects.all().values_list('name', flat=True))}")
-                return Response(
-                    {"error": f"Rol '{primary_role}' no reconocido", "code": "UNKNOWN_ROLE"},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-                
-        except Exception as e:
-            logger.error(f"EXCEPCIÓN: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return Response(
-                {"error": "Error interno del servidor", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        finally:
-            logger.info("FIN DE LOGIN")
-            logger.info("="*50)
+                logger.warning(f"Unknown role: {role_names} for user {user.username}")
+                return Response({"details":"Forbidden"}, 403)
+            
+        logger.warning(f"Inactive user attempt: {user.username}")
+        return Response({"details":"Usuario inactivo"}, status=status.HTTP_403_FORBIDDEN)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class Logout(generics.GenericAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
-        logger.info(f"Logout para usuario: {request.user.username}")
         user = request.user
         if user.is_active:
             token = Token.objects.get(user=user)
             token.delete()
-            logger.info("Logout exitoso")
             return Response({'logout': True})
         return Response({'logout': False})
