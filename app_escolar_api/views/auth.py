@@ -9,7 +9,7 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(_name_)
 
 class CustomAuthToken(ObtainAuthToken):
 
@@ -37,24 +37,31 @@ class CustomAuthToken(ObtainAuthToken):
             # Generar token
             token, created = Token.objects.get_or_create(user=user)
             
+            # Normalizar rol (lowercase y aceptar singular/plural)
+            role_normalized = role_names.lower() if role_names else ""
+            
             # Verificar que tipo de usuario quiere iniciar sesión
-            if role_names == 'alumnos':  # CAMBIADO: 'alumno' → 'alumnos'
+            if role_normalized in ['alumno', 'alumnos']:
                 alumno = Alumnos.objects.filter(user=user).first()
-                alumno = AlumnoSerializer(alumno).data
-                alumno["token"] = token.key
-                alumno["rol"] = "alumno"
+                if not alumno:
+                    return Response({"details": "Perfil de alumno no encontrado"}, 404)
+                alumno_data = AlumnoSerializer(alumno).data
+                alumno_data["token"] = token.key
+                alumno_data["rol"] = "alumno"
                 logger.info(f"Login exitoso como alumno: {user.username}")
-                return Response(alumno, 200)
+                return Response(alumno_data, 200)
                 
-            elif role_names == 'maestros':  # CAMBIADO: 'maestro' → 'maestros'
+            elif role_normalized in ['maestro', 'maestros']:
                 maestro = Maestros.objects.filter(user=user).first()
-                maestro = MaestroSerializer(maestro).data
-                maestro["token"] = token.key
-                maestro["rol"] = "maestro"
+                if not maestro:
+                    return Response({"details": "Perfil de maestro no encontrado"}, 404)
+                maestro_data = MaestroSerializer(maestro).data
+                maestro_data["token"] = token.key
+                maestro_data["rol"] = "maestro"
                 logger.info(f"Login exitoso como maestro: {user.username}")
-                return Response(maestro, 200)
+                return Response(maestro_data, 200)
                 
-            elif role_names == 'administradores':  # CAMBIADO: 'administrador' → 'administradores'
+            elif role_normalized in ['administrador', 'administradores']:
                 user_data = UserSerializer(user, many=False).data
                 user_data['token'] = token.key
                 user_data["rol"] = "administrador"
@@ -77,4 +84,4 @@ class Logout(generics.GenericAPIView):
             token = Token.objects.get(user=user)
             token.delete()
             return Response({'logout': True})
-        return Response({'logout': False})
+        return Response({'logout':False})
