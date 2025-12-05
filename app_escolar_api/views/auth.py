@@ -36,28 +36,36 @@ class CustomAuthToken(ObtainAuthToken):
 
             # Si solo es un rol especifico asignamos el elemento 0
             role_names = role_names[0]
+            logger.info(f"User role: {role_names}")  # Para debug
             
             # Generar token
             token, created = Token.objects.get_or_create(user=user)
             
             # Verificar que tipo de usuario quiere iniciar sesión
-            if role_names == 'alumno':
+            # ACEPTAR TANTO SINGULAR COMO PLURAL
+            if role_names in ['alumno', 'alumnos']:
                 alumno = Alumnos.objects.filter(user=user).first()
-                alumno = AlumnoSerializer(alumno).data
-                alumno["token"] = token.key
-                alumno["rol"] = "alumno"
+                if alumno is None:
+                    logger.error(f"No se encontró perfil de alumno para {user.username}")
+                    return Response({"details":"Perfil de alumno no encontrado"}, 404)
+                alumno_data = AlumnoSerializer(alumno).data
+                alumno_data["token"] = token.key
+                alumno_data["rol"] = "alumno"  # Siempre devolver singular
                 logger.info(f"Login successful as alumno: {user.username}")
-                return Response(alumno, 200)
+                return Response(alumno_data, 200)
                 
-            if role_names == 'maestro':
+            if role_names in ['maestro', 'maestros']:
                 maestro = Maestros.objects.filter(user=user).first()
-                maestro = MaestroSerializer(maestro).data
-                maestro["token"] = token.key
-                maestro["rol"] = "maestro"
+                if maestro is None:
+                    logger.error(f"No se encontró perfil de maestro para {user.username}")
+                    return Response({"details":"Perfil de maestro no encontrado"}, 404)
+                maestro_data = MaestroSerializer(maestro).data
+                maestro_data["token"] = token.key
+                maestro_data["rol"] = "maestro"
                 logger.info(f"Login successful as maestro: {user.username}")
-                return Response(maestro, 200)
+                return Response(maestro_data, 200)
                 
-            if role_names == 'administrador':
+            if role_names in ['administrador', 'administradores', 'admin']:
                 user_data = UserSerializer(user, many=False).data
                 user_data['token'] = token.key
                 user_data["rol"] = "administrador"
@@ -65,7 +73,7 @@ class CustomAuthToken(ObtainAuthToken):
                 return Response(user_data, 200)
             else:
                 logger.warning(f"Unknown role: {role_names} for user {user.username}")
-                return Response({"details":"Forbidden"}, 403)
+                return Response({"details":"Rol no reconocido", "rol_recibido": role_names}, 403)
             
         logger.warning(f"Inactive user attempt: {user.username}")
         return Response({"details":"Usuario inactivo"}, status=status.HTTP_403_FORBIDDEN)
