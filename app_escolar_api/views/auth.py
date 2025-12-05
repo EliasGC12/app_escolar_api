@@ -9,13 +9,14 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 
-logger = logging.getLogger(_name_)
+# CORREGIDO: __name__ con doble guión bajo
+logger = logging.getLogger(__name__)
 
 class CustomAuthToken(ObtainAuthToken):
 
     def post(self, request, *args, **kwargs):
-        # Log para depuración
-        logger.info(f"Usuario intentando login: {request.data.get('username', 'No username provided')}")
+        # Log para debug
+        logger.info(f"Login attempt with data: {request.data}")
         
         serializer = self.serializer_class(data=request.data,
                                         context={'request': request})
@@ -23,65 +24,85 @@ class CustomAuthToken(ObtainAuthToken):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         
+        logger.info(f"User found: {user.username}, Active: {user.is_active}")
+        
         if user.is_active:
             # Obtener perfil y roles del usuario
             roles = user.groups.all()
             role_names = []
             
+            # Verifico si el usuario tiene un perfil asociado
             for role in roles:
                 role_names.append(role.name)
+                
+            logger.info(f"User roles: {role_names}")
 
             # Si solo es un rol especifico asignamos el elemento 0
-            role_names = role_names[0] if role_names else None
+            # MANTENER LA MISMA LÓGICA QUE ANTES
+            if not role_names:
+                logger.warning(f"No roles for user: {user.username}")
+                return Response({"details":"Usuario sin roles asignados"}, 403)
+                
+            role_names = role_names[0]
             
-            # Generar token
+            #Esta función genera la clave dinámica (token) para iniciar sesión
             token, created = Token.objects.get_or_create(user=user)
             
-            # Normalizar rol (lowercase y aceptar singular/plural)
-            role_normalized = role_names.lower() if role_names else ""
-            
             # Verificar que tipo de usuario quiere iniciar sesión
-            if role_normalized in ['alumno', 'alumnos']:
+            # MANTENER COMPARACIONES EXACTAS COMO ANTES
+            
+            if role_names == 'alumno':
                 alumno = Alumnos.objects.filter(user=user).first()
                 if not alumno:
-                    return Response({"details": "Perfil de alumno no encontrado"}, 404)
-                alumno_data = AlumnoSerializer(alumno).data
-                alumno_data["token"] = token.key
-                alumno_data["rol"] = "alumno"
-                logger.info(f"Login exitoso como alumno: {user.username}")
-                return Response(alumno_data, 200)
+                    logger.error(f"No alumno profile for user: {user.username}")
+                    return Response({"details":"Perfil de alumno no encontrado"}, 404)
+                    
+                alumno = AlumnoSerializer(alumno).data
+                alumno["token"] = token.key
+                alumno["rol"] = "alumno"
+                logger.info(f"Successful login as alumno: {user.username}")
+                return Response(alumno,200)
                 
-            elif role_normalized in ['maestro', 'maestros']:
+            if role_names == 'maestro':
                 maestro = Maestros.objects.filter(user=user).first()
                 if not maestro:
-                    return Response({"details": "Perfil de maestro no encontrado"}, 404)
-                maestro_data = MaestroSerializer(maestro).data
-                maestro_data["token"] = token.key
-                maestro_data["rol"] = "maestro"
-                logger.info(f"Login exitoso como maestro: {user.username}")
-                return Response(maestro_data, 200)
+                    logger.error(f"No maestro profile for user: {user.username}")
+                    return Response({"details":"Perfil de maestro no encontrado"}, 404)
+                    
+                maestro = MaestroSerializer(maestro).data
+                maestro["token"] = token.key
+                maestro["rol"] = "maestro"
+                logger.info(f"Successful login as maestro: {user.username}")
+                return Response(maestro,200)
                 
-            elif role_normalized in ['administrador', 'administradores']:
+            if role_names == 'administrador':
                 user_data = UserSerializer(user, many=False).data
                 user_data['token'] = token.key
                 user_data["rol"] = "administrador"
-                logger.info(f"Login exitoso como administrador: {user.username}")
-                return Response(user_data, 200)
+                logger.info(f"Successful login as administrador: {user.username}")
+                return Response(user_data,200)
                 
             else:
-                logger.warning(f"Rol no reconocido: {role_names} para usuario {user.username}")
-                return Response({"details": "Rol no reconocido", "rol_recibido": role_names}, 403)
-                
-        return Response({"details": "Usuario inactivo"}, status=status.HTTP_403_FORBIDDEN)
+                logger.warning(f"Unrecognized role: {role_names} for user {user.username}")
+                return Response({"details":"Rol no reconocido"}, 403)
+            
+        logger.warning(f"Inactive user attempt: {user.username}")
+        return Response({"details":"Usuario inactivo"}, status=status.HTTP_403_FORBIDDEN)
 
 
 class Logout(generics.GenericAPIView):
+
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
+        logger.info(f"Logout attempt for user: {request.user.username}")
+        
         user = request.user
         if user.is_active:
             token = Token.objects.get(user=user)
             token.delete()
-            return Response({'logout': True})
-        return Response({'logout':False})
+            logger.info(f"Successful logout for user: {user.username}")
+            return Response({'logout':True})
+
+        logger.warning(f"Logout failed for inactive user: {user.username}")
+        return Response({'logout': False})
