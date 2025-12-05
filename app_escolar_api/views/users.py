@@ -112,9 +112,9 @@ class AdminView(generics.CreateAPIView):
         admin = get_object_or_404(Administradores, id=request.GET.get("id"))
         try:
             admin.user.delete()
-            return Response({"details":"Administrador eliminado"}, status=200)
+            return Response({"details": "Administrador eliminado"}, 200)
         except Exception as e:
-            return Response({"details": "Algo pasó al eliminar"}, status=400)
+            return Response({"details": "Algo pasó al eliminar"}, 400)
         
 class TotalUsers(generics.CreateAPIView):
     #Contar el total de cada tipo de usuarios

@@ -38,7 +38,7 @@ class MaestrosView(generics.CreateAPIView):
     def get(self, request, *args, **kwargs):
         maestro = get_object_or_404(Maestros, id=request.GET.get("id"))
         maestro = MaestroSerializer(maestro, many=False).data
-        #Si esta bien, entonces regresa
+        # Si todo es correcto, regresamos la información
         return Response(maestro, 200)
     
     #Registrar nuevo usuario maestro
@@ -81,11 +81,11 @@ class MaestrosView(generics.CreateAPIView):
     
     # Actualizar datos del maestro
     @transaction.atomic
-    def put(self, request, *args, **kgwargs):
-        #Verificar que el usuario este autenticado.
+    def put(self, request, *args, **kwargs):
+        # Verifica que el usuario esté autenticado
         permission_classes = (permissions.IsAuthenticated,)
-        #obtenemos el maestro sin actualizar
-        maestro = get_object_or_404(Maestros, id=request.GET.get["id"])
+        # Primero obtenemos el alumno a actualizar
+        maestro = get_object_or_404(Maestros, id=request.data["id"])
 
         maestro.id_trabajador = request.data["id_trabajador"]
         maestro.fecha_nacimiento = request.data["fecha_nacimiento"]
@@ -95,13 +95,13 @@ class MaestrosView(generics.CreateAPIView):
         maestro.area_investigacion = request.data["area_investigacion"]
         maestro.materias_json = json.dumps(request.data["materias_json"])
         maestro.save()
-        
+        # Actualizamos los datos del usuario asociado (tabla auth_user de Django)
         user = maestro.user
         user.first_name = request.data["first_name"]
         user.last_name = request.data["last_name"]
         user.save()
 
-        return Response({"messagw":"Maestro actualizado correctamente", "maestro": MaestroSerializer(maestro).data  },
+        return Response({"message": "Maestro actualizado correctamente", "maestro": MaestroSerializer(maestro).data},
                         200)
     
     # Eliminar maestro con delete (Borrar realmente)
